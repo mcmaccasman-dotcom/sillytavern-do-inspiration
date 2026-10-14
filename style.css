@@ -1,0 +1,136 @@
+.sdi-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    margin-inline: 0.25em;
+    vertical-align: middle;
+}
+
+.sdi-action {
+    min-height: 2.2em;
+    white-space: nowrap;
+}
+
+.sdi-action.sdi-do {
+    border-color: var(--SmartThemeQuoteColor, #77aaff);
+}
+
+.sdi-action.sdi-inspiration {
+    border-color: var(--SmartThemeQuoteColor, #aa88ff);
+}
+
+.sdi-action:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+#sdi-settings .inline-drawer-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+}
+
+#sdi-settings .sdi-setting {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2em;
+}
+
+#sdi-settings .sdi-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+#sdi-settings .sdi-check input {
+    width: auto;
+}
+
+#sdi-settings .sdi-panel-actions {
+    display: flex;
+    gap: 0.5em;
+}
+
+#sdi-settings .sdi-panel-actions button {
+    flex: 1;
+}
+
+.sdi-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1em;
+    background: rgba(0, 0, 0, 0.72);
+}
+
+.sdi-dialog {
+    width: min(760px, 100%);
+    max-height: min(88vh, 900px);
+    overflow: auto;
+    padding: 1em;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,.25));
+    border-radius: 0.8em;
+    color: var(--SmartThemeBodyColor, #eee);
+    background: var(--SmartThemeBlurTintColor, #202126);
+    box-shadow: 0 12px 40px rgba(0,0,0,.5);
+}
+
+.sdi-dialog > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-bottom: 0.75em;
+}
+
+.sdi-dialog h2,
+.sdi-dialog h3 {
+    margin: 0;
+}
+
+.sdi-option {
+    margin: 0.65em 0;
+    padding: 0.75em;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,.18));
+    border-radius: 0.65em;
+}
+
+.sdi-option p {
+    white-space: pre-wrap;
+    line-height: 1.45;
+}
+
+.sdi-option .menu_button {
+    margin: 0.2em 0.35em 0.2em 0;
+}
+
+.sdi-close {
+    flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+    .sdi-actions {
+        gap: 0.15em;
+        margin-inline: 0.1em;
+    }
+
+    .sdi-action {
+        padding-inline: 0.45em;
+        font-size: 0.9em;
+    }
+
+    .sdi-backdrop {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .sdi-dialog {
+        width: 100%;
+        max-height: 92vh;
+        padding: 0.8em;
+        border-radius: 1em 1em 0 0;
+    }
+}
