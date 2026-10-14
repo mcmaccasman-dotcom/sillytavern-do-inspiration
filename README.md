@@ -5,8 +5,8 @@ A standalone SillyTavern UI extension for drafting roleplay actions and generati
 ## Actions
 
 - **Do** reads the text in the message box and creates three richer rewrites. It is instructed to preserve the user's intent, point of view, events, and outcome without adding major new facts. Select an option to replace the draft in the composer; it is not sent until you press SillyTavern's Send button.
-- **Inspiration** uses recent chat and, optionally, the active character card to create three possible character replies. Choose **Add as character reply** to add the selected option directly to chat, or **Put in message box instead** to edit it before sending.
-- The buttons are placed by the SillyTavern composer when available. A copy of the buttons is also in the extension settings panel.
+- **Inspiration** uses recent chat and, optionally, the active character card to create three possible character replies. It asks the model for one reply at a time, waits briefly between requests, and opens the chooser only after all three are ready. Choose **Add as character reply** to add the selected option directly to chat, or **Put in message box instead** to edit it before sending.
+- Compact wand/lightbulb buttons sit beside SillyTavern's composer options menu, away from the Send button. A labeled copy of the buttons is also in the extension settings panel.
 - Settings control recent-message context, whether character-card details are included, and the Do rewrite style.
 
 ## Install

@@ -90,15 +90,18 @@
         }).join('\n\n').slice(-16000);
     }
 
-    function buildPrompt(kind, ctx, userDraft) {
+    function buildPrompt(kind, ctx, userDraft, priorOptions = []) {
         const character = activeCharacterText(ctx);
         const history = recentChatText(ctx);
-        const common = `\n\nACTIVE CHARACTER CARD (if present):\n${character || '(No character card supplied)'}\n\nRECENT CHAT:\n${history || '(No recent chat)'}\n\nReturn only valid JSON with exactly this shape: {"options":[{"title":"short label","text":"the complete option"},{"title":"short label","text":"the complete option"},{"title":"short label","text":"the complete option"}]}. No markdown fences or extra text.`;
+        const common = `\n\nACTIVE CHARACTER CARD (if present):\n${character || '(No character card supplied)'}\n\nRECENT CHAT:\n${history || '(No recent chat)'}`;
         if (kind === 'do') {
             const style = getSettings().doStyle;
-            return `You are a roleplay writing editor. Rewrite the user's proposed action into exactly THREE distinct, vivid, natural alternatives. Preserve the user's intent, events, outcome, character agency, and point of view; do not add major facts, decisions, dialogue, or consequences that the user did not specify. Make each alternative more detailed and immersive, but keep it plausible and ready to paste as the user's next chat message. The requested style emphasis is: ${style}. The three alternatives should vary in rhythm/detail, not contradict each other.\n\nUSER'S ACTION TO REWRITE:\n${userDraft}${common}`;
+            return `You are a roleplay writing editor. Rewrite the user's proposed action into exactly THREE distinct, vivid, natural alternatives. Preserve the user's intent, events, outcome, character agency, and point of view; do not add major facts, decisions, dialogue, or consequences that the user did not specify. Make each alternative more detailed and immersive, but keep it plausible and ready to paste as the user's next chat message. The requested style emphasis is: ${style}. The three alternatives should vary in rhythm/detail, not contradict each other.\n\nUSER'S ACTION TO REWRITE:\n${userDraft}${common}\n\nReturn only valid JSON with exactly this shape: {"options":[{"title":"short label","text":"the complete option"},{"title":"short label","text":"the complete option"},{"title":"short label","text":"the complete option"}]}. No markdown fences or extra text.`;
         }
-        return `You are the currently active SillyTavern character writing the next possible reply. Generate exactly THREE distinct response options that could naturally follow this conversation. Stay faithful to the character card, voice, knowledge, and current situation. Do not write the user's actions or dialogue. Do not claim that any option has already happened; each is an alternate possible next reply. Vary their tone or approach while preserving continuity. Keep each response useful and ready to send as the character, with no meta commentary.\n\n${common}`;
+        const previous = priorOptions.length
+            ? `\n\nALREADY-GENERATED ALTERNATIVES (do not repeat or closely paraphrase these):\n${priorOptions.map((option, index) => `${index + 1}. ${option.text}`).join('\n\n')}`
+            : '';
+        return `You are the currently active SillyTavern character writing the next possible reply. Generate exactly ONE response option that could naturally follow this conversation. Stay faithful to the character card, voice, knowledge, and current situation. Do not write the user's actions or dialogue. Do not claim that any option has already happened; this is one alternate possible next reply. Keep it useful and ready to send as the character, with no meta commentary. This is a single-option request; return one option only.${common}${previous}\n\nReturn only valid JSON with exactly this shape: {"options":[{"title":"short label","text":"the complete response"}]}. No markdown fences or extra text.`;
     }
 
     async function callActiveModel(prompt) {
@@ -113,7 +116,7 @@
         throw new Error('The active model returned an empty response.');
     }
 
-    function parseOptions(response) {
+    function parseOptions(response, expectedCount = 3) {
         const text = String(response || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
         try {
             const start = text.indexOf('{');
@@ -125,14 +128,15 @@
                     ? { title: `Option ${index + 1}`, text: item.trim() }
                     : { title: String(item.title || `Option ${index + 1}`), text: String(item.text || item.content || '').trim() })
                     .filter(item => item.text);
-                if (valid.length >= 3) return valid.slice(0, 3);
+                if (valid.length >= expectedCount) return valid.slice(0, expectedCount);
             }
         } catch { /* fall through to labelled-text parsing */ }
 
         const chunks = [...text.matchAll(/(?:^|\n)\s*(?:option\s*)?([1-3])[).:\-]\s*([\s\S]*?)(?=(?:\n\s*(?:option\s*)?[1-3][).:\-])|$)/gi)];
         const parsed = chunks.map((match, index) => ({ title: `Option ${index + 1}`, text: match[2].trim() })).filter(item => item.text);
-        if (parsed.length >= 3) return parsed.slice(0, 3);
-        throw new Error('Could not identify three options in the model response. Try again.');
+        if (parsed.length >= expectedCount) return parsed.slice(0, expectedCount);
+        if (expectedCount === 1 && text) return [{ title: 'Response', text }];
+        throw new Error(expectedCount === 1 ? 'Could not read the generated reply. Try again.' : 'Could not identify three options in the model response. Try again.');
     }
 
     function closeChooser() {
@@ -228,10 +232,21 @@
         requestBusy = true;
         updateButtonState(true);
         try {
-            toast(kind === 'do' ? 'Creating three action rewrites…' : 'Creating three inspiration replies…');
-            const prompt = buildPrompt(kind, ctx, draft);
-            const raw = await callActiveModel(prompt);
-            const options = parseOptions(raw);
+            let options;
+            if (kind === 'inspiration') {
+                options = [];
+                for (let index = 0; index < 3; index += 1) {
+                    if (index > 0) await new Promise(resolve => setTimeout(resolve, 1200));
+                    toast(`Generating Inspiration option ${index + 1} of 3 — one request at a time…`);
+                    const raw = await callActiveModel(buildPrompt('inspiration', ctx, '', options));
+                    const [option] = parseOptions(raw, 1);
+                    options.push({ title: `Option ${index + 1}`, text: option.text });
+                }
+            } else {
+                toast('Creating three action rewrites…');
+                const raw = await callActiveModel(buildPrompt('do', ctx, draft));
+                options = parseOptions(raw);
+            }
             showChooser(kind, options);
         } catch (error) {
             console.error('[Do & Inspiration]', error);
@@ -249,11 +264,19 @@
         });
     }
 
-    function createActionButton(kind) {
+    function createActionButton(kind, compact = false) {
         const button = document.createElement('button');
         button.type = 'button';
-        button.className = `menu_button sdi-action sdi-${kind}`;
-        button.textContent = kind === 'do' ? 'Do' : 'Inspiration';
+        button.className = `menu_button sdi-action sdi-${kind}${compact ? ' sdi-compact' : ''}`;
+        if (compact) {
+            const icon = document.createElement('i');
+            icon.className = kind === 'do' ? 'fa-solid fa-wand-magic-sparkles' : 'fa-solid fa-lightbulb';
+            icon.setAttribute('aria-hidden', 'true');
+            button.append(icon);
+        } else {
+            button.textContent = kind === 'do' ? 'Do' : 'Inspiration';
+        }
+        button.setAttribute('aria-label', kind === 'do' ? 'Do: rewrite your action' : 'Inspiration: generate three replies');
         button.title = kind === 'do'
             ? 'Rewrite your drafted action into three detailed options'
             : 'Generate three possible character responses';
@@ -263,14 +286,14 @@
 
     function mountButtons() {
         if (mounted) return;
-        const send = document.querySelector('#send_but');
-        const textarea = composer();
-        const anchor = send || textarea;
-        if (!anchor?.parentElement) return;
+        const menu = document.querySelector('#options_button');
+        const host = document.querySelector('#leftSendForm') || menu?.parentElement;
+        if (!host) return;
         const container = document.createElement('div');
         container.className = 'sdi-actions';
-        container.append(createActionButton('do'), createActionButton('inspiration'));
-        anchor.parentElement.insertBefore(container, send || textarea.nextSibling);
+        container.append(createActionButton('do', true), createActionButton('inspiration', true));
+        if (menu?.parentElement === host) menu.after(container);
+        else host.append(container);
         mounted = true;
     }
 
